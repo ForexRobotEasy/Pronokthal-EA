@@ -1,0 +1,112 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                           Pronokthal EA          |
+//|                                 Developed by Forex Robot Easy Team|
+//|                                             forexroboteasy.com   |
+//+------------------------------------------------------------------+
+
+// Declare global variables
+input double FundSize = 500.0; // Recommended fund size
+input ENUM_TIMEFRAMES Timeframe = PERIOD_H1; // Default timeframe
+input ENUM_ORDER_TYPE OrderType = ORDER_TYPE_BUY; // Default order type
+input double Leverage = 500.0; // Default leverage
+input int Slippage = 3; // Default slippage
+input int StopLoss = 100; // Default stop loss in points
+input int TakeProfit = 200; // Default take profit in points
+
+//+------------------------------------------------------------------+
+//| Expert Advisor initialization function                           |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   // Initialize EA settings
+   SetOptimizationCriterion(0); // Enable optimization
+   SetUseStopLevels(false); // Disable stop levels
+   SetOrderOpenPriceSlippage(Slippage); // Set slippage
+   
+   return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Expert Advisor start function                                     |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   // Check if there is enough funds to trade
+   if (AccountInfoDouble(ACCOUNT_BALANCE) < FundSize)
+   {
+      Print('Insufficient funds to trade');
+      return;
+   }
+   
+   // Loop through all currency pairs
+   for (int i = 0; i < SymbolsTotal(false); i++)
+   {
+      string symbol = SymbolName(i, false);
+      
+      // Check if the current symbol is allowed for trading
+      if (!IsAllowedSymbol(symbol))
+         continue;
+      
+      // Set symbol for trading
+      SymbolSelect(symbol, true);
+      
+      // Check if the current symbol's market is open
+      if (!MarketInfo(symbol, MODE_TRADEALLOWED))
+         continue;
+      
+      // Set leverage for the current symbol
+      if (!SymbolSetInteger(symbol, SYMBOL_LEVERAGE, Leverage))
+      {
+         Print('Failed to set leverage for symbol ', symbol);
+         continue;
+      }
+      
+      // Check if there is an open position for the current symbol
+      if (PositionSelect(symbol))
+      {
+         // Close the position if it exists
+         ClosePosition(PositionGetInteger(POSITION_TICKET), Close[0]);
+         continue;
+      }
+      
+      // Calculate lot size based on fund size
+      double lotSize = AccountInfoDouble(ACCOUNT_BALANCE) / FundSize;
+      
+      // Open a new position
+      if (!OrderSend(symbol, OrderType, lotSize, Ask, Slippage, Bid - StopLoss * Point, Bid + TakeProfit * Point))
+      {
+         Print('Failed to open position for symbol ', symbol);
+         continue;
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Check if the symbol is allowed for trading                        |
+//+------------------------------------------------------------------+
+bool IsAllowedSymbol(string symbol)
+{
+   // Add your custom symbol blacklist here
+   string[] blacklist = {'EURCHF', 'EURGBP'};
+   
+   // Check if the symbol is in the blacklist
+   for (int i = 0; i < ArraySize(blacklist); i++)
+   {
+      if (StringCompare(symbol, blacklist[i], false) == 0)
+         return false;
+   }
+   
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Expert Advisor deinitialization function                         |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   // Clean up resources
+   SymbolSelect(NULL, false);
+}
+
+//+------------------------------------------------------------------+
